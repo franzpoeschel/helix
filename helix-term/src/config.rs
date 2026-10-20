@@ -175,6 +175,25 @@ mod tests {
     }
 
     #[test]
+    fn parsing_picker_open_existing_key() {
+        use helix_view::input::{KeyCode, KeyEvent, KeyModifiers};
+
+        let config = Config::load_test(
+            r#"
+            [editor]
+            picker-open-existing = "A-ret"
+            "#,
+        );
+        assert_eq!(
+            config.editor.picker_open_existing,
+            KeyEvent {
+                code: KeyCode::Enter,
+                modifiers: KeyModifiers::ALT,
+            }
+        );
+    }
+
+    #[test]
     fn keys_resolve_to_correct_defaults() {
         // From serde default
         let default_keys = Config::load_test("").keys;

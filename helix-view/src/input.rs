@@ -1,7 +1,11 @@
 //! Input event handling, currently backed by crossterm.
 use anyhow::{anyhow, Error};
 use helix_core::unicode::{segmentation::UnicodeSegmentation, width::UnicodeWidthStr};
-use serde::de::{self, Deserialize, Deserializer};
+use serde::{
+    de::{self, Deserialize, Deserializer},
+    ser::Serializer,
+    Serialize,
+};
 use std::fmt;
 
 pub use crate::keyboard::{KeyCode, KeyModifiers, MediaKeyCode, ModifierKeyCode};
@@ -445,6 +449,15 @@ impl std::str::FromStr for KeyEvent {
         }
 
         Ok(KeyEvent { code, modifiers })
+    }
+}
+
+impl Serialize for KeyEvent {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(self)
     }
 }
 

@@ -1057,6 +1057,22 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
             EventResult::Consumed(Some(callback))
         };
 
+        if key_event == ctx.editor.config().picker_open_existing || key_event == alt!(Enter) {
+            if let Some(option) = self.selection() {
+                (self.callback_fn)(ctx, option, Action::ReplaceOrFocus);
+            }
+            if let Some(history_register) = self.prompt.history_register() {
+                if let Err(err) = ctx
+                    .editor
+                    .registers
+                    .push(history_register, self.primary_query().to_string())
+                {
+                    ctx.editor.set_error(err.to_string());
+                }
+            }
+            return close_fn(self);
+        }
+
         match key_event {
             shift!(Tab) | key!(Up) | ctrl!('p') => {
                 self.move_by(1, Direction::Backward);
@@ -1077,26 +1093,6 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
                 self.to_end();
             }
             key!(Esc) | ctrl!('c') => return close_fn(self),
-            shift!(Enter) => {
-                if let Some(option) = self.selection() {
-                    (self.callback_fn)(ctx, option, Action::ReplaceOrFocus);
-                }
-                if let Some(history_register) = self.prompt.history_register() {
-                    if let Err(err) = ctx
-                        .editor
-                        .registers
-                        .push(history_register, self.primary_query().to_string())
-                    {
-                        ctx.editor.set_error(err.to_string());
-                    }
-                }
-                return close_fn(self);
-            }
-            alt!(Enter) => {
-                if let Some(option) = self.selection() {
-                    (self.callback_fn)(ctx, option, self.default_action);
-                }
-            }
             key!(Enter) => {
                 // If the prompt has a history completion and is empty, use enter to accept
                 // that completion

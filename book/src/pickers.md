@@ -17,3 +17,8 @@ already displayed in another view, that view is focused instead of replacing the
 current one. If the file is displayed in multiple views, the most recently focused
 one is chosen. If the file is not displayed anywhere, the current view is replaced as
 usual.
+
+`Alt-Enter` performs the same action. Some terminals cannot distinguish
+`Shift-Enter` from `Enter` unless they support the Kitty keyboard protocol, so
+`Alt-Enter` can be used as a fallback. The key can also be changed with the
+`picker-open-existing` option in the `[editor]` section.

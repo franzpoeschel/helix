@@ -8,7 +8,7 @@ use crate::{
     graphics::{CursorKind, Rect},
     handlers::Handlers,
     info::Info,
-    input::KeyEvent,
+    input::{KeyCode, KeyEvent, KeyModifiers},
     register::Registers,
     theme::{self, Theme},
     tree::{self, Tree},
@@ -376,6 +376,9 @@ pub struct Config {
     /// Whether to read settings from [EditorConfig](https://editorconfig.org) files. Defaults to
     /// `true`.
     pub editor_config: bool,
+    /// Key used in pickers to open the selected item in an existing view when possible.
+    /// Defaults to `S-ret`.
+    pub picker_open_existing: KeyEvent,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Eq, PartialOrd, Ord)]
@@ -1035,6 +1038,10 @@ impl Default for Config {
             end_of_line_diagnostics: DiagnosticFilter::Disable,
             clipboard_provider: ClipboardProvider::default(),
             editor_config: true,
+            picker_open_existing: KeyEvent {
+                code: KeyCode::Enter,
+                modifiers: KeyModifiers::SHIFT,
+            },
         }
     }
 }
