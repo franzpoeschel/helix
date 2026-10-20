@@ -3,8 +3,8 @@
 | `no_op` | Do nothing |  |
 | `move_char_left` | Move left | normal: `` h ``, `` <left> ``, insert: `` <left> `` |
 | `move_char_right` | Move right | normal: `` l ``, `` <right> ``, insert: `` <right> `` |
-| `move_line_up` | Move up | normal: `` gk `` |
-| `move_line_down` | Move down | normal: `` gj `` |
+| `move_line_up` | Move up | normal: `` Gk ``, `` gk ``, select: `` Gk `` |
+| `move_line_down` | Move down | normal: `` Gj ``, `` gj ``, select: `` Gj `` |
 | `move_visual_line_up` | Move up | normal: `` k ``, `` <up> ``, insert: `` <up> `` |
 | `move_visual_line_down` | Move down | normal: `` j ``, `` <down> ``, insert: `` <down> `` |
 | `extend_char_left` | Extend left | select: `` h ``, `` <left> `` |
@@ -121,27 +121,35 @@
 | `select_mode` | Enter selection extend mode | normal: `` v `` |
 | `exit_select_mode` | Exit selection mode | select: `` <esc> `` |
 | `goto_definition` | Goto definition | normal: `` gd ``, select: `` gd `` |
+| `goto_definition_existing` | Goto definition | normal: `` Gd ``, select: `` Gd `` |
 | `goto_declaration` | Goto declaration | normal: `` gD ``, select: `` gD `` |
+| `goto_declaration_existing` | Goto declaration | normal: `` GD ``, select: `` GD `` |
 | `add_newline_above` | Add newline above | normal: `` [<space> ``, select: `` [<space> `` |
 | `add_newline_below` | Add newline below | normal: `` ]<space> ``, select: `` ]<space> `` |
 | `goto_type_definition` | Goto type definition | normal: `` gy ``, select: `` gy `` |
+| `goto_type_definition_existing` | Goto type definition | normal: `` Gy ``, select: `` Gy `` |
 | `goto_implementation` | Goto implementation | normal: `` gi ``, select: `` gi `` |
-| `goto_file_start` | Goto line number <n> else file start | normal: `` gg `` |
+| `goto_implementation_existing` | Goto implementation | normal: `` Gi ``, select: `` Gi `` |
+| `goto_file_start` | Goto line number <n> else file start | normal: `` Gg ``, `` gg ``, select: `` Gg `` |
 | `goto_file_end` | Goto file end |  |
 | `extend_to_file_start` | Extend to line number<n> else file start | select: `` gg `` |
 | `extend_to_file_end` | Extend to file end |  |
 | `goto_file` | Goto files/URLs in selections | normal: `` gf ``, select: `` gf `` |
+| `goto_file_existing` | Goto files/URLs in selections | normal: `` Gf ``, select: `` Gf `` |
 | `goto_file_hsplit` | Goto files in selections (hsplit) | normal: `` <C-w>f ``, `` <space>wf ``, select: `` <C-w>f ``, `` <space>wf `` |
 | `goto_file_vsplit` | Goto files in selections (vsplit) | normal: `` <C-w>F ``, `` <space>wF ``, select: `` <C-w>F ``, `` <space>wF `` |
 | `goto_reference` | Goto references | normal: `` gr ``, select: `` gr `` |
-| `goto_window_top` | Goto window top | normal: `` gt ``, select: `` gt `` |
-| `goto_window_center` | Goto window center | normal: `` gc ``, select: `` gc `` |
-| `goto_window_bottom` | Goto window bottom | normal: `` gb ``, select: `` gb `` |
+| `goto_reference_existing` | Goto references | normal: `` Gr ``, select: `` Gr `` |
+| `goto_window_top` | Goto window top | normal: `` Gt ``, `` gt ``, select: `` Gt ``, `` gt `` |
+| `goto_window_center` | Goto window center | normal: `` Gc ``, `` gc ``, select: `` Gc ``, `` gc `` |
+| `goto_window_bottom` | Goto window bottom | normal: `` Gb ``, `` gb ``, select: `` Gb ``, `` gb `` |
 | `goto_last_accessed_file` | Goto last accessed file | normal: `` ga ``, select: `` ga `` |
+| `goto_last_accessed_file_existing` | Goto last accessed file | normal: `` Ga ``, select: `` Ga `` |
 | `goto_last_modified_file` | Goto last modified file | normal: `` gm ``, select: `` gm `` |
-| `goto_last_modification` | Goto last modification | normal: `` g. ``, select: `` g. `` |
-| `goto_line` | Goto line | normal: `` G ``, select: `` G `` |
-| `goto_last_line` | Goto last line | normal: `` ge `` |
+| `goto_last_modified_file_existing` | Goto last modified file | normal: `` Gm ``, select: `` Gm `` |
+| `goto_last_modification` | Goto last modification | normal: `` G. ``, `` g. ``, select: `` G. ``, `` g. `` |
+| `goto_line` | Goto line | normal: `` GG ``, `` gG ``, select: `` GG ``, `` gG `` |
+| `goto_last_line` | Goto last line | normal: `` Ge ``, `` ge ``, select: `` Ge `` |
 | `extend_to_last_line` | Extend to last line | select: `` ge `` |
 | `goto_first_diag` | Goto first diagnostic | normal: `` [D ``, select: `` [D `` |
 | `goto_last_diag` | Goto last diagnostic | normal: `` ]D ``, select: `` ]D `` |
@@ -151,14 +159,16 @@
 | `goto_prev_change` | Goto previous change | normal: `` [g ``, select: `` [g `` |
 | `goto_first_change` | Goto first change | normal: `` [G ``, select: `` [G `` |
 | `goto_last_change` | Goto last change | normal: `` ]G ``, select: `` ]G `` |
-| `goto_line_start` | Goto line start | normal: `` gh ``, `` <home> ``, select: `` gh ``, insert: `` <home> `` |
-| `goto_line_end` | Goto line end | normal: `` gl ``, `` <end> ``, select: `` gl `` |
-| `goto_column` | Goto column | normal: `` g\| `` |
+| `goto_line_start` | Goto line start | normal: `` Gh ``, `` gh ``, `` <home> ``, select: `` Gh ``, `` gh ``, insert: `` <home> `` |
+| `goto_line_end` | Goto line end | normal: `` Gl ``, `` gl ``, `` <end> ``, select: `` Gl ``, `` gl `` |
+| `goto_column` | Goto column | normal: `` G\| ``, `` g\| ``, select: `` G\| `` |
 | `extend_to_column` | Extend to column | select: `` g\| `` |
 | `goto_next_buffer` | Goto next buffer | normal: `` gn ``, select: `` gn `` |
+| `goto_next_buffer_existing` | Goto next buffer | normal: `` Gn ``, select: `` Gn `` |
 | `goto_previous_buffer` | Goto previous buffer | normal: `` gp ``, select: `` gp `` |
+| `goto_previous_buffer_existing` | Goto previous buffer | normal: `` Gp ``, select: `` Gp `` |
 | `goto_line_end_newline` | Goto newline at line end | insert: `` <end> `` |
-| `goto_first_nonwhitespace` | Goto first non-blank in line | normal: `` gs ``, select: `` gs `` |
+| `goto_first_nonwhitespace` | Goto first non-blank in line | normal: `` Gs ``, `` gs ``, select: `` Gs ``, `` gs `` |
 | `trim_selections` | Trim whitespace from selections | normal: `` _ ``, select: `` _ `` |
 | `extend_to_line_start` | Extend to line start | select: `` <home> `` |
 | `extend_to_first_nonwhitespace` | Extend to first non-blank in line |  |
@@ -299,7 +309,7 @@
 | `record_macro` | Record macro | normal: `` Q ``, select: `` Q `` |
 | `replay_macro` | Replay macro | normal: `` q ``, select: `` q `` |
 | `command_palette` | Open command palette | normal: `` <space>? ``, select: `` <space>? `` |
-| `goto_word` | Jump to a two-character label | normal: `` gw `` |
+| `goto_word` | Jump to a two-character label | normal: `` Gw ``, `` gw ``, select: `` Gw `` |
 | `extend_to_word` | Extend to a two-character label | select: `` gw `` |
 | `goto_next_tabstop` | Goto next snippet placeholder |  |
 | `goto_prev_tabstop` | Goto next snippet placeholder |  |

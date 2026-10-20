@@ -421,6 +421,28 @@ mod tests {
     }
 
     #[test]
+    fn goto_reuse_menu_bindings() {
+        let keymaps = Keymaps::default().map();
+        let normal = keymaps.get(&Mode::Normal).unwrap();
+
+        assert_eq!(
+            normal.search(&[key!('G'), key!('d')]).unwrap(),
+            &KeyTrie::MappableCommand(MappableCommand::goto_definition_existing),
+            "Shift-g should open the reuse-existing-view Goto menu"
+        );
+        assert_eq!(
+            normal.search(&[key!('G'), key!('G')]).unwrap(),
+            &KeyTrie::MappableCommand(MappableCommand::goto_line),
+            "GG should still go to a line"
+        );
+        assert_eq!(
+            normal.search(&[key!('g'), key!('G')]).unwrap(),
+            &KeyTrie::MappableCommand(MappableCommand::goto_line),
+            "gG should still go to a line"
+        );
+    }
+
+    #[test]
     fn merge_partial_keys() {
         let keymap = hashmap! {
             Mode::Normal => keymap!({ "Normal mode"

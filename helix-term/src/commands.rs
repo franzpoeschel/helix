@@ -419,24 +419,32 @@ impl MappableCommand {
         select_mode, "Enter selection extend mode",
         exit_select_mode, "Exit selection mode",
         goto_definition, "Goto definition",
+        goto_definition_existing, "Goto definition",
         goto_declaration, "Goto declaration",
+        goto_declaration_existing, "Goto declaration",
         add_newline_above, "Add newline above",
         add_newline_below, "Add newline below",
         goto_type_definition, "Goto type definition",
+        goto_type_definition_existing, "Goto type definition",
         goto_implementation, "Goto implementation",
+        goto_implementation_existing, "Goto implementation",
         goto_file_start, "Goto line number <n> else file start",
         goto_file_end, "Goto file end",
         extend_to_file_start, "Extend to line number<n> else file start",
         extend_to_file_end, "Extend to file end",
         goto_file, "Goto files/URLs in selections",
+        goto_file_existing, "Goto files/URLs in selections",
         goto_file_hsplit, "Goto files in selections (hsplit)",
         goto_file_vsplit, "Goto files in selections (vsplit)",
         goto_reference, "Goto references",
+        goto_reference_existing, "Goto references",
         goto_window_top, "Goto window top",
         goto_window_center, "Goto window center",
         goto_window_bottom, "Goto window bottom",
         goto_last_accessed_file, "Goto last accessed file",
+        goto_last_accessed_file_existing, "Goto last accessed file",
         goto_last_modified_file, "Goto last modified file",
+        goto_last_modified_file_existing, "Goto last modified file",
         goto_last_modification, "Goto last modification",
         goto_line, "Goto line",
         goto_last_line, "Goto last line",
@@ -454,7 +462,9 @@ impl MappableCommand {
         goto_column, "Goto column",
         extend_to_column, "Extend to column",
         goto_next_buffer, "Goto next buffer",
+        goto_next_buffer_existing, "Goto next buffer",
         goto_previous_buffer, "Goto previous buffer",
+        goto_previous_buffer_existing, "Goto previous buffer",
         goto_line_end_newline, "Goto newline at line end",
         goto_first_nonwhitespace, "Goto first non-blank in line",
         trim_selections, "Trim whitespace from selections",
@@ -894,14 +904,32 @@ fn goto_line_start(cx: &mut Context) {
 }
 
 fn goto_next_buffer(cx: &mut Context) {
-    goto_buffer(cx.editor, Direction::Forward, cx.count());
+    goto_buffer(cx.editor, Direction::Forward, cx.count(), Action::Replace);
+}
+
+fn goto_next_buffer_existing(cx: &mut Context) {
+    goto_buffer(
+        cx.editor,
+        Direction::Forward,
+        cx.count(),
+        Action::ReplaceOrFocus,
+    );
 }
 
 fn goto_previous_buffer(cx: &mut Context) {
-    goto_buffer(cx.editor, Direction::Backward, cx.count());
+    goto_buffer(cx.editor, Direction::Backward, cx.count(), Action::Replace);
 }
 
-fn goto_buffer(editor: &mut Editor, direction: Direction, count: usize) {
+fn goto_previous_buffer_existing(cx: &mut Context) {
+    goto_buffer(
+        cx.editor,
+        Direction::Backward,
+        cx.count(),
+        Action::ReplaceOrFocus,
+    );
+}
+
+fn goto_buffer(editor: &mut Editor, direction: Direction, count: usize, action: Action) {
     let current = view!(editor).doc;
 
     let id = match direction {
@@ -923,7 +951,7 @@ fn goto_buffer(editor: &mut Editor, direction: Direction, count: usize) {
 
     let id = *id;
 
-    editor.switch(id, Action::Replace);
+    editor.switch(id, action);
 }
 
 fn extend_to_line_start(cx: &mut Context) {
@@ -1306,6 +1334,10 @@ fn goto_file(cx: &mut Context) {
     goto_file_impl(cx, Action::Replace);
 }
 
+fn goto_file_existing(cx: &mut Context) {
+    goto_file_impl(cx, Action::ReplaceOrFocus);
+}
+
 fn goto_file_hsplit(cx: &mut Context) {
     goto_file_impl(cx, Action::HorizontalSplit);
 }
@@ -1364,7 +1396,7 @@ fn goto_file_impl(cx: &mut Context, action: Action) {
         let path = path::expand(&sel);
         let path = &rel_path.join(path);
         if path.is_dir() {
-            let picker = ui::file_picker(cx.editor, path.into());
+            let picker = ui::file_picker(cx.editor, path.into()).with_default_action(action);
             cx.push_layer(Box::new(overlaid(picker)));
         } else if let Err(e) = cx.editor.open(path, action) {
             cx.editor.set_error(format!("Open file failed: {:?}", e));
@@ -3860,9 +3892,17 @@ fn goto_column_impl(cx: &mut Context, movement: Movement) {
 }
 
 fn goto_last_accessed_file(cx: &mut Context) {
+    goto_last_accessed_file_impl(cx, Action::Replace);
+}
+
+fn goto_last_accessed_file_existing(cx: &mut Context) {
+    goto_last_accessed_file_impl(cx, Action::ReplaceOrFocus);
+}
+
+fn goto_last_accessed_file_impl(cx: &mut Context, action: Action) {
     let view = view_mut!(cx.editor);
     if let Some(alt) = view.docs_access_history.pop() {
-        cx.editor.switch(alt, Action::Replace);
+        cx.editor.switch(alt, action);
     } else {
         cx.editor.set_error("no last accessed buffer")
     }
@@ -3882,6 +3922,14 @@ fn goto_last_modification(cx: &mut Context) {
 }
 
 fn goto_last_modified_file(cx: &mut Context) {
+    goto_last_modified_file_impl(cx, Action::Replace);
+}
+
+fn goto_last_modified_file_existing(cx: &mut Context) {
+    goto_last_modified_file_impl(cx, Action::ReplaceOrFocus);
+}
+
+fn goto_last_modified_file_impl(cx: &mut Context, action: Action) {
     let view = view!(cx.editor);
     let alternate_file = view
         .last_modified_docs
@@ -3889,7 +3937,7 @@ fn goto_last_modified_file(cx: &mut Context) {
         .flatten()
         .find(|&id| id != view.doc);
     if let Some(alt) = alternate_file {
-        cx.editor.switch(alt, Action::Replace);
+        cx.editor.switch(alt, action);
     } else {
         cx.editor.set_error("no last modified buffer")
     }

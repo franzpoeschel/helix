@@ -51,7 +51,7 @@ Normal mode is the default mode when you launch helix. You can return to it from
 | `f`                   | Find next char                                     | `find_next_char`            |
 | `T`                   | Find till previous char                            | `till_prev_char`            |
 | `F`                   | Find previous char                                 | `find_prev_char`            |
-| `G`                   | Go to line number `<n>`                            | `goto_line`                 |
+| `G`                   | Open Goto menu (reuse existing views)              | N/A                         |
 | `Alt-.`               | Repeat last motion (`f`, `t`, `m`, `[` or `]`)     | `repeat_last_motion`        |
 | `Home`                | Move to the start of the line                      | `goto_line_start`           |
 | `End`                 | Move to the end of the line                        | `goto_line_end`             |
@@ -234,6 +234,27 @@ Jumps to various locations.
 | `j`   | Move down textual (instead of visual) line       | `move_line_down`           |
 | `k`   | Move up textual (instead of visual) line         | `move_line_up`             |
 | `w`   | Show labels at each word and select the word that belongs to the entered labels | `goto_word` |
+| `G`   | Go to line number `<n>`                          | `goto_line`                |
+
+#### Goto mode (reuse existing view)
+
+Accessed by typing `G` in [normal mode](#normal-mode). It contains the same entries
+as the regular Goto mode, but file and location jumps reuse an existing view when
+the target file is already displayed.
+
+| Key   | Description                                      | Command                              |
+| ----- | -----------                                      | -------                              |
+| `f`   | Go to files in the selections                    | `goto_file_existing`                 |
+| `d`   | Go to definition (**LSP**)                       | `goto_definition_existing`           |
+| `D`   | Go to declaration (**LSP**)                      | `goto_declaration_existing`          |
+| `y`   | Go to type definition (**LSP**)                  | `goto_type_definition_existing`      |
+| `r`   | Go to references (**LSP**)                       | `goto_reference_existing`            |
+| `i`   | Go to implementation (**LSP**)                   | `goto_implementation_existing`       |
+| `a`   | Go to the last accessed/alternate file           | `goto_last_accessed_file_existing`   |
+| `m`   | Go to the last modified/alternate file           | `goto_last_modified_file_existing`   |
+| `n`   | Go to next buffer                                | `goto_next_buffer_existing`          |
+| `p`   | Go to previous buffer                            | `goto_previous_buffer_existing`      |
+| `G`   | Go to line number `<n>`                          | `goto_line`                          |
 
 #### Match mode
 
@@ -458,6 +479,7 @@ See the documentation page on [pickers](./pickers.md) for more info.
 | `Home`                       | Go to first entry                                          |
 | `End`                        | Go to last entry                                           |
 | `Enter`                      | Open selected                                              |
+| `Shift-Enter`                | Open selected, reusing an existing view if already displayed |
 | `Alt-Enter`                  | Open selected in the background without closing the picker |
 | `Ctrl-s`                     | Open horizontally                                          |
 | `Ctrl-v`                     | Open vertically                                            |

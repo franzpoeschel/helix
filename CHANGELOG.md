@@ -20,6 +20,16 @@ Updated languages and queries:
 Packaging:
 -->
 
+# Unreleased
+
+Breaking changes:
+
+* `G` now opens the reuse-existing-view Goto menu. `goto_line` moved to `gG` or `GG`.
+
+Features:
+
+* Add `Shift-Enter` in pickers and a `Shift-g` Goto menu that reuse an existing view when the target file is already displayed.
+
 # 25.07.1 (2025-07-18)
 
 This is a patch release which lowers the GLIBC requirements of the release artifacts published to GitHub ([#13983](https://github.com/helix-editor/helix/pull/13983))

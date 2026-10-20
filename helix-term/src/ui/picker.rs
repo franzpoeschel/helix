@@ -258,6 +258,7 @@ pub struct Picker<T: 'static + Send + Sync, D: 'static> {
     widths: Vec<Constraint>,
 
     callback_fn: PickerCallback<T>,
+    default_action: Action,
 
     pub truncate_start: bool,
     /// Caches paths to documents
@@ -382,6 +383,7 @@ impl<T: 'static + Send + Sync, D: 'static + Send + Sync> Picker<T, D> {
             truncate_start: true,
             show_preview: true,
             callback_fn: Box::new(callback_fn),
+            default_action: Action::Replace,
             completion_height: 0,
             widths,
             preview_cache: HashMap::new(),
@@ -421,6 +423,12 @@ impl<T: 'static + Send + Sync, D: 'static + Send + Sync> Picker<T, D> {
 
     pub fn with_history_register(mut self, history_register: Option<char>) -> Self {
         self.prompt.with_history_register(history_register);
+        self
+    }
+
+    /// Set the action used when accepting an item with Enter.
+    pub fn with_default_action(mut self, action: Action) -> Self {
+        self.default_action = action;
         self
     }
 
@@ -1069,9 +1077,24 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
                 self.to_end();
             }
             key!(Esc) | ctrl!('c') => return close_fn(self),
+            shift!(Enter) => {
+                if let Some(option) = self.selection() {
+                    (self.callback_fn)(ctx, option, Action::ReplaceOrFocus);
+                }
+                if let Some(history_register) = self.prompt.history_register() {
+                    if let Err(err) = ctx
+                        .editor
+                        .registers
+                        .push(history_register, self.primary_query().to_string())
+                    {
+                        ctx.editor.set_error(err.to_string());
+                    }
+                }
+                return close_fn(self);
+            }
             alt!(Enter) => {
                 if let Some(option) = self.selection() {
-                    (self.callback_fn)(ctx, option, Action::Replace);
+                    (self.callback_fn)(ctx, option, self.default_action);
                 }
             }
             key!(Enter) => {
@@ -1095,7 +1118,7 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
                     self.handle_prompt_change(true);
                 } else {
                     if let Some(option) = self.selection() {
-                        (self.callback_fn)(ctx, option, Action::Replace);
+                        (self.callback_fn)(ctx, option, self.default_action);
                     }
                     if let Some(history_register) = self.prompt.history_register() {
                         if let Err(err) = ctx

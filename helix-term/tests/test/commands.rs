@@ -119,6 +119,41 @@ async fn test_selection_duplication() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_goto_line_from_reuse_menu() -> anyhow::Result<()> {
+    test((
+        indoc! {"\
+            #[o|]#ne
+            two
+            three
+        "},
+        "3GG",
+        indoc! {"\
+            one
+            two
+            #[t|]#hree
+        "},
+    ))
+    .await?;
+
+    test((
+        indoc! {"\
+            #[o|]#ne
+            two
+            three
+        "},
+        "3gG",
+        indoc! {"\
+            one
+            two
+            #[t|]#hree
+        "},
+    ))
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_goto_file_impl() -> anyhow::Result<()> {
     let file = tempfile::NamedTempFile::new()?;
 

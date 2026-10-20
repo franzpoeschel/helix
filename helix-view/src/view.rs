@@ -141,6 +141,8 @@ pub struct View {
     pub object_selections: Vec<Selection>,
     /// all gutter-related configuration settings, used primarily for gutter rendering
     pub gutters: GutterConfig,
+    /// when this view was most recently focused
+    pub focused_at: std::time::Instant,
     /// A mapping between documents and the last history revision the view was updated at.
     /// Changes between documents and views are synced lazily when switching windows. This
     /// mapping keeps track of the last applied history revision so that only new changes
@@ -177,9 +179,15 @@ impl View {
             last_modified_docs: [None, None],
             object_selections: Vec::new(),
             gutters,
+            focused_at: std::time::Instant::now(),
             doc_revisions: HashMap::new(),
             diagnostics_handler: DiagnosticsHandler::new(),
         }
+    }
+
+    /// Mark this view as recently focused for MRU selection
+    pub fn mark_as_focused(&mut self) {
+        self.focused_at = std::time::Instant::now();
     }
 
     pub fn add_to_history(&mut self, id: DocumentId) {

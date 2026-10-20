@@ -1180,6 +1180,9 @@ pub enum CompleteAction {
 pub enum Action {
     Load,
     Replace,
+    /// Replace the current view, or focus an existing view if the document is
+    /// already displayed in one.
+    ReplaceOrFocus,
     HorizontalSplit,
     VerticalSplit,
 }
@@ -1615,6 +1618,7 @@ impl Editor {
         let view = self.tree.get_mut(current_view);
 
         view.doc = doc_id;
+        view.mark_as_focused();
         let doc = doc_mut!(self, &doc_id);
 
         doc.ensure_view_init(view.id);
@@ -1622,6 +1626,15 @@ impl Editor {
         doc.mark_as_focused();
 
         view.ensure_cursor_in_view(doc, scrolloff)
+    }
+
+    /// Find the most recently focused view displaying the given document.
+    fn view_id_for_document(&self, id: DocumentId) -> Option<ViewId> {
+        self.tree
+            .views()
+            .filter(|(view, _)| view.doc == id)
+            .max_by_key(|(view, focused)| (view.focused_at, *focused))
+            .map(|(view, _)| view.id)
     }
 
     pub fn switch(&mut self, id: DocumentId, action: Action) {
@@ -1636,8 +1649,15 @@ impl Editor {
             self.enter_normal_mode();
         }
 
+        if matches!(action, Action::ReplaceOrFocus) {
+            if let Some(view_id) = self.view_id_for_document(id) {
+                self.focus(view_id);
+                return;
+            }
+        }
+
         let focust_lost = match action {
-            Action::Replace => {
+            Action::Replace | Action::ReplaceOrFocus => {
                 let (view, doc) = current_ref!(self);
                 // If the current view is an empty scratch buffer and is not displayed in any other views, delete it.
                 // Boolean value is determined before the call to `view_mut` because the operation requires a borrow
@@ -1702,12 +1722,13 @@ impl Editor {
             Action::HorizontalSplit | Action::VerticalSplit => {
                 let focus_lost = self.tree.try_get(self.tree.focus).map(|view| view.doc);
                 // copy the current view, unless there is no view yet
-                let view = self
+                let mut view = self
                     .tree
                     .try_get(self.tree.focus)
                     .filter(|v| id == v.doc) // Different Document
                     .cloned()
                     .unwrap_or_else(|| View::new(id, self.config().gutters.clone()));
+                view.mark_as_focused();
                 let view_id = self.tree.split(
                     view,
                     match action {
@@ -1974,8 +1995,10 @@ impl Editor {
                 let doc = doc_mut!(self, &view.doc);
                 view.sync_changes(doc);
             }
-            let view = view!(self, view_id);
-            let doc = doc_mut!(self, &view.doc);
+            let view = self.tree.get_mut(view_id);
+            view.mark_as_focused();
+            let doc_id = view.doc;
+            let doc = doc_mut!(self, &doc_id);
             doc.mark_as_focused();
             let focus_lost = self.tree.get(prev_id).doc;
             dispatch(DocumentFocusLost {
