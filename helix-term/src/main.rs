@@ -87,6 +87,10 @@ FLAGS:
 
     if args.display_version {
         println!("helix {}", VERSION_AND_GIT_HASH);
+        match std::env::current_exe() {
+            Ok(path) => println!("binary: {}", path.display()),
+            Err(err) => println!("binary: <unknown: {err}>"),
+        }
         std::process::exit(0);
     }
 
