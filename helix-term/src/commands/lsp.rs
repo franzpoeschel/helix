@@ -11,7 +11,7 @@ use helix_lsp::{
 use tokio_stream::StreamExt;
 use tui::{text::Span, widgets::Row};
 
-use super::{align_view, push_jump, Align, Context, Editor};
+use super::{align_view, Align, Context, Editor};
 
 use helix_core::{
     diagnostic::DiagnosticProvider, syntax::config::LanguageServerFeature,
@@ -110,14 +110,18 @@ fn location_to_file_location(location: &Location) -> Option<FileLocation> {
 }
 
 fn jump_to_location(editor: &mut Editor, location: &Location, action: Action) {
-    let (view, doc) = current!(editor);
-    push_jump(view, doc);
-
     let Some(path) = location.uri.as_path() else {
         let err = format!("unable to convert URI to filepath: {:?}", location.uri);
         editor.set_error(err);
         return;
     };
+
+    let (source_view, jump) = {
+        let (view, doc) = current!(editor);
+        doc.append_changes_to_history(view);
+        (view.id, (doc.id(), doc.selection(view.id).clone()))
+    };
+
     jump_to_position(
         editor,
         path,
@@ -125,6 +129,13 @@ fn jump_to_location(editor: &mut Editor, location: &Location, action: Action) {
         location.offset_encoding,
         action,
     );
+
+    let target_view = if matches!(action, Action::ReplaceOrFocus) {
+        editor.tree.focus
+    } else {
+        source_view
+    };
+    editor.tree.get_mut(target_view).jumps.push(jump);
 }
 
 fn jump_to_position(

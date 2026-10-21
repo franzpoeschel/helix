@@ -62,7 +62,7 @@
 | `end-of-line-diagnostics` | Minimum severity of diagnostics to render at the end of the line. Set to `disable` to disable entirely. Refer to the setting about `inline-diagnostics` for more details | "disable"
 | `clipboard-provider` | Which API to use for clipboard interaction. One of `pasteboard` (MacOS), `wayland`, `x-clip`, `x-sel`, `win-32-yank`, `termux`, `tmux`, `windows`, `termcode`, `none`, or a custom command set. | Platform and environment specific. |
 | `editor-config` | Whether to read settings from [EditorConfig](https://editorconfig.org) files | `true` |
-| `picker-open-existing` | Key used in pickers to open the selected item in an existing view when possible. Some terminals require this to be changed because they cannot distinguish `Shift-Enter` from `Enter`. | `"S-ret"` |
+| `picker-open-existing` | Key used in pickers to open the selected item in an existing view when possible. | `"A-r"` |
 
 ### `[editor.clipboard-provider]` Section
 

@@ -181,13 +181,13 @@ mod tests {
         let config = Config::load_test(
             r#"
             [editor]
-            picker-open-existing = "A-ret"
+            picker-open-existing = "A-r"
             "#,
         );
         assert_eq!(
             config.editor.picker_open_existing,
             KeyEvent {
-                code: KeyCode::Enter,
+                code: KeyCode::Char('r'),
                 modifiers: KeyModifiers::ALT,
             }
         );

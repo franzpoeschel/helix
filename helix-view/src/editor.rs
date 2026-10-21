@@ -377,7 +377,7 @@ pub struct Config {
     /// `true`.
     pub editor_config: bool,
     /// Key used in pickers to open the selected item in an existing view when possible.
-    /// Defaults to `S-ret`.
+    /// Defaults to `A-r`.
     pub picker_open_existing: KeyEvent,
 }
 
@@ -1039,8 +1039,8 @@ impl Default for Config {
             clipboard_provider: ClipboardProvider::default(),
             editor_config: true,
             picker_open_existing: KeyEvent {
-                code: KeyCode::Enter,
-                modifiers: KeyModifiers::SHIFT,
+                code: KeyCode::Char('r'),
+                modifiers: KeyModifiers::ALT,
             },
         }
     }
@@ -1622,10 +1622,13 @@ impl Editor {
 
     fn replace_document_in_view(&mut self, current_view: ViewId, doc_id: DocumentId) {
         let scrolloff = self.config().scrolloff;
+        let is_focused = current_view == self.tree.focus;
         let view = self.tree.get_mut(current_view);
 
         view.doc = doc_id;
-        view.mark_as_focused();
+        if is_focused {
+            view.mark_as_focused();
+        }
         let doc = doc_mut!(self, &doc_id);
 
         doc.ensure_view_init(view.id);

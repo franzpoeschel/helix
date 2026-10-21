@@ -1057,7 +1057,7 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
             EventResult::Consumed(Some(callback))
         };
 
-        if key_event == ctx.editor.config().picker_open_existing || key_event == alt!(Enter) {
+        if key_event == ctx.editor.config().picker_open_existing {
             if let Some(option) = self.selection() {
                 (self.callback_fn)(ctx, option, Action::ReplaceOrFocus);
             }
@@ -1126,6 +1126,11 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
                         }
                     }
                     return close_fn(self);
+                }
+            }
+            alt!(Enter) => {
+                if let Some(option) = self.selection() {
+                    (self.callback_fn)(ctx, option, self.default_action);
                 }
             }
             ctrl!('s') => {

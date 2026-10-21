@@ -479,8 +479,8 @@ See the documentation page on [pickers](./pickers.md) for more info.
 | `Home`                       | Go to first entry                                          |
 | `End`                        | Go to last entry                                           |
 | `Enter`                      | Open selected                                              |
-| `Shift-Enter`                | Open selected, reusing an existing view if already displayed (configurable with `picker-open-existing`) |
-| `Alt-Enter`                  | Open selected, reusing an existing view if already displayed |
+| `Alt-r`                      | Open selected, reusing an existing view if already displayed (configurable with `picker-open-existing`) |
+| `Alt-Enter`                  | Open selected in the background without closing the picker |
 | `Ctrl-s`                     | Open horizontally                                          |
 | `Ctrl-v`                     | Open vertically                                            |
 | `Ctrl-t`                     | Toggle preview                                             |

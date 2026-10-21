@@ -12,13 +12,12 @@ You can insert the contents of a [register](./registers.md) using `Ctrl-r` follo
 
 ### Reusing existing views
 
-Pressing `Shift-Enter` opens the selected item like `Enter`, but if the target file is
+Pressing `Alt-r` opens the selected item like `Enter`, but if the target file is
 already displayed in another view, that view is focused instead of replacing the
 current one. If the file is displayed in multiple views, the currently focused view
 has the lowest priority and the most recently focused other view is chosen. If the
 file is not displayed anywhere, the current view is replaced as usual.
 
-`Alt-Enter` performs the same action. Some terminals cannot distinguish
-`Shift-Enter` from `Enter` unless they support the Kitty keyboard protocol, so
-`Alt-Enter` can be used as a fallback. The key can also be changed with the
-`picker-open-existing` option in the `[editor]` section.
+The key can be changed with the `picker-open-existing` option in the `[editor]`
+section. `Alt-Enter` keeps its previous behavior of opening the selected item in
+the background without closing the picker.

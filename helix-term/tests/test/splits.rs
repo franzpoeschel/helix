@@ -198,7 +198,7 @@ async fn test_changes_in_splits_apply_to_all_views() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_picker_shift_enter_reuses_existing_view() -> anyhow::Result<()> {
+async fn test_picker_alt_r_reuses_existing_view() -> anyhow::Result<()> {
     let dir = tempfile::tempdir()?;
     let file_a = dir.path().join("a.txt");
     let file_b = dir.path().join("b.txt");
@@ -210,7 +210,7 @@ async fn test_picker_shift_enter_reuses_existing_view() -> anyhow::Result<()> {
         .build()?;
 
     let keys = format!(
-        ":sp<ret>:o {}<ret>:sp<ret>:o {}<ret><space>bb.txt<S-ret>",
+        ":sp<ret>:o {}<ret>:sp<ret>:o {}<ret><space>bb.txt<A-r>",
         file_b.display(),
         file_a.display()
     );

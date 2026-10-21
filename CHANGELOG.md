@@ -28,7 +28,7 @@ Breaking changes:
 
 Features:
 
-* Add `Shift-Enter` in pickers and a `Shift-g` Goto menu that reuse an existing view when the target file is already displayed, preferring views other than the currently focused one. `Alt-Enter` is also supported, and the picker key is configurable with `picker-open-existing`.
+* Add `Alt-r` in pickers and a `Shift-g` Goto menu that reuse an existing view when the target file is already displayed, preferring views other than the currently focused one. The picker key is configurable with `picker-open-existing`.
 
 Usability improvements:
 

@@ -1433,7 +1433,7 @@ fn open_url(cx: &mut Context, url: Url, action: Action) {
         Ok(_) | Err(_) => {
             let path = &rel_path.join(url.path());
             if path.is_dir() {
-                let picker = ui::file_picker(cx.editor, path.into());
+                let picker = ui::file_picker(cx.editor, path.into()).with_default_action(action);
                 cx.push_layer(Box::new(overlaid(picker)));
             } else if let Err(e) = cx.editor.open(path, action) {
                 cx.editor.set_error(format!("Open file failed: {:?}", e));
