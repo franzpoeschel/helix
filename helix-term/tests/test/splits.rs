@@ -345,6 +345,13 @@ async fn test_replace_or_focus_uses_most_recent_view() -> anyhow::Result<()> {
         "the most recently focused view showing b.txt should be selected"
     );
 
+    app.editor.focus(b_views[1]);
+    app.editor.switch(b_id, Action::ReplaceOrFocus);
+    assert_eq!(
+        b_views[0], app.editor.tree.focus,
+        "the currently focused view should be the lowest priority"
+    );
+
     let file_c = dir.path().join("c.txt");
     std::fs::write(&file_c, "c")?;
     let view_count = app.editor.tree.views().count();

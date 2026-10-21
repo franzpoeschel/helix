@@ -1635,12 +1635,14 @@ impl Editor {
         view.ensure_cursor_in_view(doc, scrolloff)
     }
 
-    /// Find the most recently focused view displaying the given document.
+    /// Find a view displaying the given document, preferring views other than
+    /// the currently focused one. Among equally preferred views, the most
+    /// recently focused view is chosen.
     fn view_id_for_document(&self, id: DocumentId) -> Option<ViewId> {
         self.tree
             .views()
             .filter(|(view, _)| view.doc == id)
-            .max_by_key(|(view, focused)| (view.focused_at, *focused))
+            .max_by_key(|(view, _)| (view.id != self.tree.focus, view.focused_at))
             .map(|(view, _)| view.id)
     }
 

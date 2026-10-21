@@ -14,9 +14,9 @@ You can insert the contents of a [register](./registers.md) using `Ctrl-r` follo
 
 Pressing `Shift-Enter` opens the selected item like `Enter`, but if the target file is
 already displayed in another view, that view is focused instead of replacing the
-current one. If the file is displayed in multiple views, the most recently focused
-one is chosen. If the file is not displayed anywhere, the current view is replaced as
-usual.
+current one. If the file is displayed in multiple views, the currently focused view
+has the lowest priority and the most recently focused other view is chosen. If the
+file is not displayed anywhere, the current view is replaced as usual.
 
 `Alt-Enter` performs the same action. Some terminals cannot distinguish
 `Shift-Enter` from `Enter` unless they support the Kitty keyboard protocol, so
