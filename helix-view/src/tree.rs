@@ -301,6 +301,15 @@ impl Tree {
         self.try_get(index).unwrap()
     }
 
+    /// Return the layout of the container holding the given view.
+    pub fn layout_of(&self, view_id: ViewId) -> Option<Layout> {
+        let parent = self.nodes.get(view_id)?.parent;
+        match &self.nodes.get(parent)?.content {
+            Content::Container(container) => Some(container.layout),
+            Content::View(_) => None,
+        }
+    }
+
     /// Try to get reference to a [View] by index. Returns `None` if node content is not a [`Content::View`].
     ///
     /// Does not panic if the view does not exists anymore.

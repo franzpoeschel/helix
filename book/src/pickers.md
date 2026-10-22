@@ -12,11 +12,12 @@ You can insert the contents of a [register](./registers.md) using `Ctrl-r` follo
 
 ### Reusing existing views
 
-Pressing `Alt-r` opens the selected item like `Enter`, but if the target file is
-already displayed in another view, that view is focused instead of replacing the
-current one. If the file is displayed in multiple views, the currently focused view
-has the lowest priority and the most recently focused other view is chosen. If the
-file is not displayed anywhere, the current view is replaced as usual.
+Pressing `Alt-r` opens the selected item like `Enter`, but never in the current
+view. If the target file is already displayed in another view, that view is focused.
+If it is displayed in multiple other views, the most recently focused one is chosen.
+If it is not displayed in another view, a new split is created. With a single view,
+the split follows the view's longer axis; with multiple views, it follows the current
+view's layout axis.
 
 The key can be changed with the `picker-open-existing` option in the `[editor]`
 section. `Alt-Enter` keeps its previous behavior of opening the selected item in

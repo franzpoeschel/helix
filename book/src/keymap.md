@@ -239,8 +239,8 @@ Jumps to various locations.
 #### Goto mode (reuse existing view)
 
 Accessed by typing `G` in [normal mode](#normal-mode). It contains the same entries
-as the regular Goto mode, but file and location jumps reuse an existing view when
-the target file is already displayed.
+as the regular Goto mode, but file and location jumps never open in the current view:
+they focus another view already displaying the target, or create a new split.
 
 | Key   | Description                                      | Command                              |
 | ----- | -----------                                      | -------                              |
@@ -479,7 +479,7 @@ See the documentation page on [pickers](./pickers.md) for more info.
 | `Home`                       | Go to first entry                                          |
 | `End`                        | Go to last entry                                           |
 | `Enter`                      | Open selected                                              |
-| `Alt-r`                      | Open selected, reusing an existing view if already displayed (configurable with `picker-open-existing`) |
+| `Alt-r`                      | Open selected in another view or a new split (configurable with `picker-open-existing`) |
 | `Alt-Enter`                  | Open selected in the background without closing the picker |
 | `Ctrl-s`                     | Open horizontally                                          |
 | `Ctrl-v`                     | Open vertically                                            |

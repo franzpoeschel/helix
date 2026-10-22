@@ -130,7 +130,7 @@ fn jump_to_location(editor: &mut Editor, location: &Location, action: Action) {
         action,
     );
 
-    let target_view = if matches!(action, Action::ReplaceOrFocus) {
+    let target_view = if matches!(action, Action::FocusOrSplit) {
         editor.tree.focus
     } else {
         source_view
@@ -963,7 +963,7 @@ pub fn goto_declaration(cx: &mut Context) {
 }
 
 pub fn goto_declaration_existing(cx: &mut Context) {
-    goto_declaration_impl(cx, Action::ReplaceOrFocus);
+    goto_declaration_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_declaration_impl(cx: &mut Context, action: Action) {
@@ -980,7 +980,7 @@ pub fn goto_definition(cx: &mut Context) {
 }
 
 pub fn goto_definition_existing(cx: &mut Context) {
-    goto_definition_impl(cx, Action::ReplaceOrFocus);
+    goto_definition_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_definition_impl(cx: &mut Context, action: Action) {
@@ -997,7 +997,7 @@ pub fn goto_type_definition(cx: &mut Context) {
 }
 
 pub fn goto_type_definition_existing(cx: &mut Context) {
-    goto_type_definition_impl(cx, Action::ReplaceOrFocus);
+    goto_type_definition_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_type_definition_impl(cx: &mut Context, action: Action) {
@@ -1014,7 +1014,7 @@ pub fn goto_implementation(cx: &mut Context) {
 }
 
 pub fn goto_implementation_existing(cx: &mut Context) {
-    goto_implementation_impl(cx, Action::ReplaceOrFocus);
+    goto_implementation_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_implementation_impl(cx: &mut Context, action: Action) {
@@ -1031,7 +1031,7 @@ pub fn goto_reference(cx: &mut Context) {
 }
 
 pub fn goto_reference_existing(cx: &mut Context) {
-    goto_reference_impl(cx, Action::ReplaceOrFocus);
+    goto_reference_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_reference_impl(cx: &mut Context, action: Action) {

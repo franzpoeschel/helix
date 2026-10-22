@@ -913,7 +913,7 @@ fn goto_next_buffer_existing(cx: &mut Context) {
         cx.editor,
         Direction::Forward,
         cx.count(),
-        Action::ReplaceOrFocus,
+        Action::FocusOrSplit,
     );
 }
 
@@ -926,7 +926,7 @@ fn goto_previous_buffer_existing(cx: &mut Context) {
         cx.editor,
         Direction::Backward,
         cx.count(),
-        Action::ReplaceOrFocus,
+        Action::FocusOrSplit,
     );
 }
 
@@ -1336,7 +1336,7 @@ fn goto_file(cx: &mut Context) {
 }
 
 fn goto_file_existing(cx: &mut Context) {
-    goto_file_impl(cx, Action::ReplaceOrFocus);
+    goto_file_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_file_hsplit(cx: &mut Context) {
@@ -3897,7 +3897,7 @@ fn goto_last_accessed_file(cx: &mut Context) {
 }
 
 fn goto_last_accessed_file_existing(cx: &mut Context) {
-    goto_last_accessed_file_impl(cx, Action::ReplaceOrFocus);
+    goto_last_accessed_file_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_last_accessed_file_impl(cx: &mut Context, action: Action) {
@@ -3927,7 +3927,7 @@ fn goto_last_modified_file(cx: &mut Context) {
 }
 
 fn goto_last_modified_file_existing(cx: &mut Context) {
-    goto_last_modified_file_impl(cx, Action::ReplaceOrFocus);
+    goto_last_modified_file_impl(cx, Action::FocusOrSplit);
 }
 
 fn goto_last_modified_file_impl(cx: &mut Context, action: Action) {

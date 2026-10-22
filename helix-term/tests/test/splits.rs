@@ -299,7 +299,7 @@ async fn test_goto_existing_reuses_existing_view() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_replace_or_focus_uses_most_recent_view() -> anyhow::Result<()> {
+async fn test_focus_or_split_uses_most_recent_view() -> anyhow::Result<()> {
     let dir = tempfile::tempdir()?;
     let file_a = dir.path().join("a.txt");
     let file_b = dir.path().join("b.txt");
@@ -338,7 +338,7 @@ async fn test_replace_or_focus_uses_most_recent_view() -> anyhow::Result<()> {
     app.editor.focus(b_views[0]);
     app.editor.focus(b_views[1]);
     app.editor.focus(a_view);
-    app.editor.switch(b_id, Action::ReplaceOrFocus);
+    app.editor.switch(b_id, Action::FocusOrSplit);
 
     assert_eq!(
         b_views[1], app.editor.tree.focus,
@@ -346,7 +346,7 @@ async fn test_replace_or_focus_uses_most_recent_view() -> anyhow::Result<()> {
     );
 
     app.editor.focus(b_views[1]);
-    app.editor.switch(b_id, Action::ReplaceOrFocus);
+    app.editor.switch(b_id, Action::FocusOrSplit);
     assert_eq!(
         b_views[0], app.editor.tree.focus,
         "the currently focused view should be the lowest priority"
@@ -355,13 +355,48 @@ async fn test_replace_or_focus_uses_most_recent_view() -> anyhow::Result<()> {
     let file_c = dir.path().join("c.txt");
     std::fs::write(&file_c, "c")?;
     let view_count = app.editor.tree.views().count();
-    let c_id = app.editor.open(&file_c, Action::ReplaceOrFocus)?;
+    let c_id = app.editor.open(&file_c, Action::FocusOrSplit)?;
     assert_eq!(c_id, doc!(app.editor).id());
     assert_eq!(
-        view_count,
+        view_count + 1,
         app.editor.tree.views().count(),
-        "opening a buffer that is not displayed should replace the current view"
+        "opening a buffer that is not displayed should create a new split"
     );
+    assert_eq!(
+        2,
+        app.editor
+            .tree
+            .views()
+            .filter(|(view, _)| view.doc == b_id)
+            .count()
+    );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_focus_or_split_splits_single_view() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let file_a = dir.path().join("a.txt");
+    let file_b = dir.path().join("b.txt");
+    std::fs::write(&file_a, "a")?;
+    std::fs::write(&file_b, "b")?;
+
+    let mut app = helpers::AppBuilder::new()
+        .with_file(&file_a, None)
+        .build()?;
+    helpers::run_event_loop_until_idle(&mut app).await;
+
+    let a_id = app
+        .editor
+        .document_id_by_path(&path::canonicalize(&file_a))
+        .unwrap();
+    let b_id = app.editor.open(&file_b, Action::FocusOrSplit)?;
+
+    assert_eq!(b_id, doc!(app.editor).id());
+    assert_eq!(2, app.editor.tree.views().count());
+    assert!(app.editor.tree.views().any(|(view, _)| view.doc == a_id));
+    assert!(app.editor.tree.views().any(|(view, _)| view.doc == b_id));
 
     Ok(())
 }

@@ -1059,7 +1059,7 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
 
         if key_event == ctx.editor.config().picker_open_existing {
             if let Some(option) = self.selection() {
-                (self.callback_fn)(ctx, option, Action::ReplaceOrFocus);
+                (self.callback_fn)(ctx, option, Action::FocusOrSplit);
             }
             if let Some(history_register) = self.prompt.history_register() {
                 if let Err(err) = ctx

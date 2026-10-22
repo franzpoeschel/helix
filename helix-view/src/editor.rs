@@ -1187,9 +1187,9 @@ pub enum CompleteAction {
 pub enum Action {
     Load,
     Replace,
-    /// Replace the current view, or focus an existing view if the document is
-    /// already displayed in one.
-    ReplaceOrFocus,
+    /// Focus an existing view if the document is already displayed in one,
+    /// otherwise open the document in a new split.
+    FocusOrSplit,
     HorizontalSplit,
     VerticalSplit,
 }
@@ -1638,15 +1638,31 @@ impl Editor {
         view.ensure_cursor_in_view(doc, scrolloff)
     }
 
-    /// Find a view displaying the given document, preferring views other than
-    /// the currently focused one. Among equally preferred views, the most
-    /// recently focused view is chosen.
+    /// Find a view other than the currently focused one displaying the given
+    /// document. Among matching views, the most recently focused view is chosen.
     fn view_id_for_document(&self, id: DocumentId) -> Option<ViewId> {
         self.tree
             .views()
-            .filter(|(view, _)| view.doc == id)
-            .max_by_key(|(view, _)| (view.id != self.tree.focus, view.focused_at))
+            .filter(|(view, _)| view.doc == id && view.id != self.tree.focus)
+            .max_by_key(|(view, _)| view.focused_at)
             .map(|(view, _)| view.id)
+    }
+
+    /// Choose a split direction matching the current view axis.
+    fn split_action_for_current_view(&self) -> Action {
+        if self.tree.views().count() == 1 {
+            let view = self.tree.get(self.tree.focus);
+            if view.area.width >= view.area.height {
+                Action::VerticalSplit
+            } else {
+                Action::HorizontalSplit
+            }
+        } else {
+            match self.tree.layout_of(self.tree.focus) {
+                Some(tree::Layout::Horizontal) => Action::HorizontalSplit,
+                Some(tree::Layout::Vertical) | None => Action::VerticalSplit,
+            }
+        }
     }
 
     pub fn switch(&mut self, id: DocumentId, action: Action) {
@@ -1661,15 +1677,20 @@ impl Editor {
             self.enter_normal_mode();
         }
 
-        if matches!(action, Action::ReplaceOrFocus) {
+        if matches!(action, Action::FocusOrSplit) {
             if let Some(view_id) = self.view_id_for_document(id) {
                 self.focus(view_id);
                 return;
             }
         }
 
+        let action = match action {
+            Action::FocusOrSplit => self.split_action_for_current_view(),
+            action => action,
+        };
+
         let focust_lost = match action {
-            Action::Replace | Action::ReplaceOrFocus => {
+            Action::Replace => {
                 let (view, doc) = current_ref!(self);
                 // If the current view is an empty scratch buffer and is not displayed in any other views, delete it.
                 // Boolean value is determined before the call to `view_mut` because the operation requires a borrow
@@ -1755,6 +1776,7 @@ impl Editor {
                 doc.mark_as_focused();
                 focus_lost
             }
+            Action::FocusOrSplit => unreachable!("handled above"),
         };
 
         self._refresh();
