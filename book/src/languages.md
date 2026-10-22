@@ -154,6 +154,15 @@ For example, with typescript:
 config = { format = { "semicolons" = "insert", "insertSpaceBeforeFunctionParenthesis" = true } }
 ```
 
+### Formatting modified lines
+
+Use `:format-modified` to format only the lines changed relative to the version control
+base. This uses the language server's
+[Range Formatting](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting)
+request, so it only works with language servers that support range formatting, not with
+external formatter commands. If the file has no diff base (for example because it is
+untracked), the whole document is treated as modified.
+
 ### Configuring Language Servers for a language
 
 The `language-servers` attribute in a language tells helix which language servers are used for this language.

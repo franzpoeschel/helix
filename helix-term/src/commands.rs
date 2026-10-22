@@ -3,7 +3,7 @@ pub(crate) mod lsp;
 pub(crate) mod typed;
 
 pub use dap::*;
-use futures_util::FutureExt;
+use futures_util::{future::join_all, FutureExt};
 use helix_event::status;
 use helix_stdx::{
     path::{self, find_paths},
@@ -506,7 +506,8 @@ impl MappableCommand {
         paste_primary_clipboard_before, "Paste primary clipboard before selections",
         indent, "Indent selection",
         unindent, "Unindent selection",
-        format_selections, "Format selection",
+        format_selections, "Format selections",
+        format_modified_lines, "Format modified lines",
         join_selections, "Join lines inside selection",
         join_selections_space, "Join lines inside selection and select spaces",
         keep_selections, "Keep selections matching regex",
@@ -4965,70 +4966,244 @@ fn unindent(cx: &mut Context) {
 }
 
 fn format_selections(cx: &mut Context) {
-    use helix_lsp::{lsp, util::range_to_lsp_range};
-
-    let (view, doc) = current!(cx.editor);
-    let view_id = view.id;
-
-    // via lsp if available
-    // TODO: else via tree-sitter indentation calculations
-
-    if doc.selection(view_id).len() != 1 {
-        cx.editor
-            .set_error("format_selections only supports a single selection for now");
-        return;
-    }
-
-    // TODO extra LanguageServerFeature::FormatSelections?
-    // maybe such that LanguageServerFeature::Format contains it as well
-    let Some(language_server) = doc
-        .language_servers_with_feature(LanguageServerFeature::Format)
-        .find(|ls| {
-            matches!(
-                ls.capabilities().document_range_formatting_provider,
-                Some(lsp::OneOf::Left(true) | lsp::OneOf::Right(_))
-            )
-        })
-    else {
-        cx.editor
-            .set_error("No configured language server supports range formatting");
-        return;
+    let ranges = {
+        let (view, doc) = current_ref!(cx.editor);
+        doc.selection(view.id).iter().copied().collect()
     };
 
-    let offset_encoding = language_server.offset_encoding();
-    let ranges: Vec<lsp::Range> = doc
-        .selection(view_id)
-        .iter()
-        .map(|range| range_to_lsp_range(doc.text(), *range, offset_encoding))
-        .collect();
+    if let Err(err) = format_ranges(cx.editor, cx.jobs, ranges) {
+        cx.editor.set_error(err.to_string());
+    }
+}
 
-    // TODO: handle fails
-    // TODO: concurrent map over all ranges
+fn format_modified_lines(cx: &mut Context) {
+    if let Err(err) = format_modified_lines_impl(cx.editor, cx.jobs) {
+        cx.editor.set_error(err.to_string());
+    }
+}
 
-    let range = ranges[0];
+fn format_modified_lines_impl(editor: &mut Editor, jobs: &mut Jobs) -> anyhow::Result<()> {
+    let ranges = {
+        let doc = doc!(editor);
+        modified_line_ranges(doc)
+    };
 
-    let future = language_server
-        .text_document_range_formatting(
-            doc.identifier(),
-            range,
-            lsp::FormattingOptions {
-                tab_size: doc.tab_width() as u32,
-                insert_spaces: matches!(doc.indent_style, IndentStyle::Spaces(_)),
-                ..Default::default()
-            },
-            None,
+    if ranges.is_empty() {
+        bail!("No modified lines to format");
+    }
+
+    format_ranges(editor, jobs, ranges)
+}
+
+/// Returns the character ranges covered by modified lines in the current document.
+///
+/// The diff base is usually the version control HEAD, so this includes all changes since the
+/// last commit, not just changes made in the current editing session. If no diff is available
+/// (for example for an untracked file), the whole document is treated as modified.
+fn modified_line_ranges(doc: &Document) -> Vec<Range> {
+    let text = doc.text().slice(..);
+    let Some(handle) = doc.diff_handle() else {
+        return vec![Range::new(0, text.len_chars())];
+    };
+
+    let diff = handle.load();
+    hunk_after_ranges((0..diff.len()).map(|idx| diff.nth_hunk(idx)), text)
+}
+
+fn hunk_after_ranges(hunks: impl Iterator<Item = Hunk>, text: RopeSlice) -> Vec<Range> {
+    let mut ranges = Vec::new();
+
+    for hunk in hunks {
+        if hunk.after.is_empty() {
+            // Deletions do not leave any lines to format.
+            continue;
+        }
+
+        let start = text.line_to_char(hunk.after.start as usize);
+        let end = text.line_to_char(hunk.after.end as usize);
+        if start < end {
+            ranges.push(Range::new(start, end));
+        }
+    }
+
+    ranges
+}
+
+fn merge_format_ranges(mut ranges: Vec<Range>) -> Vec<Range> {
+    ranges.sort_unstable_by_key(|range| range.from());
+
+    let mut merged: Vec<Range> = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        if let Some(last) = merged.last_mut() {
+            if range.from() <= last.to() {
+                let end = last.to().max(range.to());
+                *last = Range::new(last.from(), end);
+                continue;
+            }
+        }
+        merged.push(range);
+    }
+
+    merged
+}
+
+fn filter_overlapping_format_edits(
+    text: &Rope,
+    mut edits: Vec<helix_lsp::lsp::TextEdit>,
+    offset_encoding: helix_lsp::OffsetEncoding,
+    keep_last: bool,
+) -> Vec<helix_lsp::lsp::TextEdit> {
+    edits.sort_by_key(|edit| edit.range.start);
+    if keep_last {
+        edits.reverse();
+    }
+
+    let mut filtered = Vec::with_capacity(edits.len());
+    let mut last_end = 0;
+    let mut dropped = 0;
+
+    for edit in edits {
+        let Some(start) = helix_lsp::util::lsp_pos_to_pos(text, edit.range.start, offset_encoding)
+        else {
+            continue;
+        };
+        let Some(end) = helix_lsp::util::lsp_pos_to_pos(text, edit.range.end, offset_encoding)
+        else {
+            continue;
+        };
+
+        if start < last_end {
+            dropped += 1;
+            continue;
+        }
+
+        last_end = end;
+        filtered.push(edit);
+    }
+
+    if keep_last {
+        filtered.reverse();
+    }
+
+    if dropped > 0 {
+        log::warn!("discarded {dropped} overlapping range formatting edits");
+    }
+
+    filtered
+}
+
+fn format_ranges(editor: &mut Editor, jobs: &mut Jobs, ranges: Vec<Range>) -> anyhow::Result<()> {
+    use helix_lsp::{lsp, util::range_to_lsp_range};
+
+    let ranges = merge_format_ranges(ranges);
+    if ranges.is_empty() {
+        bail!("No ranges to format");
+    }
+
+    let (
+        doc_id,
+        view_id,
+        doc_version,
+        text,
+        offset_encoding,
+        text_document,
+        options,
+        language_server,
+        lsp_ranges,
+    ) = {
+        let (view, doc) = current_ref!(editor);
+
+        let Some(language_server) = doc
+            .language_servers_with_feature(LanguageServerFeature::Format)
+            .find(|ls| {
+                matches!(
+                    ls.capabilities().document_range_formatting_provider,
+                    Some(lsp::OneOf::Left(true) | lsp::OneOf::Right(_))
+                )
+            })
+        else {
+            bail!("No configured language server supports range formatting");
+        };
+
+        let language_server_id = language_server.id();
+        let offset_encoding = language_server.offset_encoding();
+        let text_document = doc.identifier();
+        let options = lsp::FormattingOptions {
+            tab_size: doc.tab_width() as u32,
+            insert_spaces: matches!(doc.indent_style, IndentStyle::Spaces(_)),
+            ..Default::default()
+        };
+        let lsp_ranges: Vec<lsp::Range> = ranges
+            .iter()
+            .map(|range| range_to_lsp_range(doc.text(), *range, offset_encoding))
+            .collect();
+
+        let language_server = editor
+            .language_servers
+            .get_by_id(language_server_id)
+            .cloned()
+            .context("Language server is no longer available")?;
+
+        (
+            doc.id(),
+            view.id,
+            doc.version(),
+            doc.text().clone(),
+            offset_encoding,
+            text_document,
+            options,
+            language_server,
+            lsp_ranges,
         )
-        .unwrap();
+    };
 
-    let edits = tokio::task::block_in_place(|| helix_lsp::block_on(future))
-        .ok()
-        .flatten()
-        .unwrap_or_default();
+    jobs.callback(async move {
+        let futures = lsp_ranges
+            .into_iter()
+            .filter_map(|range| {
+                language_server.text_document_range_formatting(
+                    text_document.clone(),
+                    range,
+                    options.clone(),
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
 
-    let transaction =
-        helix_lsp::util::generate_transaction_from_edits(doc.text(), edits, offset_encoding);
+        let mut edits = Vec::new();
+        for result in join_all(futures).await {
+            match result {
+                Ok(Some(mut result_edits)) => edits.append(&mut result_edits),
+                Ok(None) => (),
+                Err(err) => log::error!("Range formatting failed: {err}"),
+            }
+        }
 
-    doc.apply(&transaction, view_id);
+        let edits = filter_overlapping_format_edits(&text, edits, offset_encoding, true);
+        let transaction =
+            helix_lsp::util::generate_transaction_from_edits(&text, edits, offset_encoding);
+
+        Ok(Callback::Editor(Box::new(move |editor| {
+            if !editor.documents.contains_key(&doc_id) || !editor.tree.contains(view_id) {
+                return;
+            }
+
+            let scrolloff = editor.config().scrolloff;
+            let doc = doc_mut!(editor, &doc_id);
+            if doc.version() != doc_version {
+                log::info!("discarded formatting changes because the document changed");
+                return;
+            }
+
+            let view = view_mut!(editor, view_id);
+            doc.apply(&transaction, view.id);
+            doc.append_changes_to_history(view);
+            doc.detect_indent_and_line_ending();
+            view.ensure_cursor_in_view(doc, scrolloff);
+        })))
+    });
+
+    Ok(())
 }
 
 fn join_selections_impl(cx: &mut Context, select_space: bool) {
@@ -6870,4 +7045,105 @@ fn jump_to_word(cx: &mut Context, behaviour: Movement) {
         }
     }
     jump_to_label(cx, words, behaviour)
+}
+
+#[cfg(test)]
+mod format_tests {
+    use super::{filter_overlapping_format_edits, merge_format_ranges};
+    use helix_core::{Range, Rope};
+    use helix_lsp::{lsp, OffsetEncoding};
+    use helix_vcs::Hunk;
+
+    #[test]
+    fn merge_format_ranges_coalesces_touching_and_overlapping_ranges() {
+        assert_eq!(
+            merge_format_ranges(vec![
+                Range::new(2, 4),
+                Range::new(4, 7),
+                Range::new(9, 11),
+                Range::new(10, 13),
+            ]),
+            vec![Range::new(2, 7), Range::new(9, 13)]
+        );
+    }
+
+    #[test]
+    fn hunk_after_ranges_maps_new_lines_and_skips_deletions() {
+        let text = Rope::from("a\nb\nc\nd\n");
+        assert_eq!(
+            super::hunk_after_ranges(
+                [
+                    Hunk {
+                        before: 1..3,
+                        after: 1..3,
+                    },
+                    Hunk {
+                        before: 3..4,
+                        after: 3..3,
+                    },
+                ]
+                .into_iter(),
+                text.slice(..)
+            ),
+            vec![Range::new(2, 6)]
+        );
+    }
+
+    #[test]
+    fn filter_overlapping_format_edits_discards_conflicts() {
+        let text = Rope::from("abcdef");
+        let edits = vec![
+            lsp::TextEdit {
+                range: lsp::Range {
+                    start: lsp::Position::new(0, 1),
+                    end: lsp::Position::new(0, 4),
+                },
+                new_text: "x".into(),
+            },
+            lsp::TextEdit {
+                range: lsp::Range {
+                    start: lsp::Position::new(0, 3),
+                    end: lsp::Position::new(0, 5),
+                },
+                new_text: "y".into(),
+            },
+            lsp::TextEdit {
+                range: lsp::Range {
+                    start: lsp::Position::new(0, 5),
+                    end: lsp::Position::new(0, 6),
+                },
+                new_text: "z".into(),
+            },
+        ];
+
+        let filtered = filter_overlapping_format_edits(&text, edits, OffsetEncoding::Utf8, false);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[0].new_text, "x");
+        assert_eq!(filtered[1].new_text, "z");
+    }
+
+    #[test]
+    fn filter_overlapping_format_edits_can_prefer_later_edits() {
+        let text = Rope::from("abcdef");
+        let edits = vec![
+            lsp::TextEdit {
+                range: lsp::Range {
+                    start: lsp::Position::new(0, 1),
+                    end: lsp::Position::new(0, 4),
+                },
+                new_text: "x".into(),
+            },
+            lsp::TextEdit {
+                range: lsp::Range {
+                    start: lsp::Position::new(0, 3),
+                    end: lsp::Position::new(0, 5),
+                },
+                new_text: "y".into(),
+            },
+        ];
+
+        let filtered = filter_overlapping_format_edits(&text, edits, OffsetEncoding::Utf8, true);
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].new_text, "y");
+    }
 }

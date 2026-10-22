@@ -28,6 +28,7 @@ Breaking changes:
 
 Features:
 
+* Add `:format-modified` and the `format_modified_lines` command to format only lines changed relative to the version control base using LSP range formatting.
 * Add `Alt-r` in pickers and a `Shift-g` Goto menu that reuse an existing view when the target file is already displayed, preferring views other than the currently focused one. The picker key is configurable with `picker-open-existing`.
 
 Usability improvements:
