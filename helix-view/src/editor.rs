@@ -8,7 +8,7 @@ use crate::{
     graphics::{CursorKind, Rect},
     handlers::Handlers,
     info::Info,
-    input::KeyEvent,
+    input::{KeyCode, KeyEvent, KeyModifiers},
     register::Registers,
     theme::{self, Theme},
     tree::{self, Tree},
@@ -376,6 +376,9 @@ pub struct Config {
     /// Whether to read settings from [EditorConfig](https://editorconfig.org) files. Defaults to
     /// `true`.
     pub editor_config: bool,
+    /// Key used in pickers to open the selected item in an existing view when possible.
+    /// Defaults to `A-r`.
+    pub picker_open_existing: KeyEvent,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize, Eq, PartialOrd, Ord)]
@@ -1035,6 +1038,10 @@ impl Default for Config {
             end_of_line_diagnostics: DiagnosticFilter::Disable,
             clipboard_provider: ClipboardProvider::default(),
             editor_config: true,
+            picker_open_existing: KeyEvent {
+                code: KeyCode::Char('r'),
+                modifiers: KeyModifiers::ALT,
+            },
         }
     }
 }
@@ -1180,6 +1187,9 @@ pub enum CompleteAction {
 pub enum Action {
     Load,
     Replace,
+    /// Focus an existing view if the document is already displayed in one,
+    /// otherwise open the document in a new split.
+    FocusOrSplit,
     HorizontalSplit,
     VerticalSplit,
 }
@@ -1612,9 +1622,13 @@ impl Editor {
 
     fn replace_document_in_view(&mut self, current_view: ViewId, doc_id: DocumentId) {
         let scrolloff = self.config().scrolloff;
+        let is_focused = current_view == self.tree.focus;
         let view = self.tree.get_mut(current_view);
 
         view.doc = doc_id;
+        if is_focused {
+            view.mark_as_focused();
+        }
         let doc = doc_mut!(self, &doc_id);
 
         doc.ensure_view_init(view.id);
@@ -1622,6 +1636,33 @@ impl Editor {
         doc.mark_as_focused();
 
         view.ensure_cursor_in_view(doc, scrolloff)
+    }
+
+    /// Find a view other than the currently focused one displaying the given
+    /// document. Among matching views, the most recently focused view is chosen.
+    fn view_id_for_document(&self, id: DocumentId) -> Option<ViewId> {
+        self.tree
+            .views()
+            .filter(|(view, _)| view.doc == id && view.id != self.tree.focus)
+            .max_by_key(|(view, _)| view.focused_at)
+            .map(|(view, _)| view.id)
+    }
+
+    /// Choose a split direction matching the current view axis.
+    fn split_action_for_current_view(&self) -> Action {
+        if self.tree.views().count() == 1 {
+            let view = self.tree.get(self.tree.focus);
+            if view.area.width >= view.area.height {
+                Action::VerticalSplit
+            } else {
+                Action::HorizontalSplit
+            }
+        } else {
+            match self.tree.layout_of(self.tree.focus) {
+                Some(tree::Layout::Horizontal) => Action::HorizontalSplit,
+                Some(tree::Layout::Vertical) | None => Action::VerticalSplit,
+            }
+        }
     }
 
     pub fn switch(&mut self, id: DocumentId, action: Action) {
@@ -1635,6 +1676,18 @@ impl Editor {
         if !matches!(action, Action::Load) {
             self.enter_normal_mode();
         }
+
+        if matches!(action, Action::FocusOrSplit) {
+            if let Some(view_id) = self.view_id_for_document(id) {
+                self.focus(view_id);
+                return;
+            }
+        }
+
+        let action = match action {
+            Action::FocusOrSplit => self.split_action_for_current_view(),
+            action => action,
+        };
 
         let focust_lost = match action {
             Action::Replace => {
@@ -1702,12 +1755,13 @@ impl Editor {
             Action::HorizontalSplit | Action::VerticalSplit => {
                 let focus_lost = self.tree.try_get(self.tree.focus).map(|view| view.doc);
                 // copy the current view, unless there is no view yet
-                let view = self
+                let mut view = self
                     .tree
                     .try_get(self.tree.focus)
                     .filter(|v| id == v.doc) // Different Document
                     .cloned()
                     .unwrap_or_else(|| View::new(id, self.config().gutters.clone()));
+                view.mark_as_focused();
                 let view_id = self.tree.split(
                     view,
                     match action {
@@ -1722,6 +1776,7 @@ impl Editor {
                 doc.mark_as_focused();
                 focus_lost
             }
+            Action::FocusOrSplit => unreachable!("handled above"),
         };
 
         self._refresh();
@@ -1974,8 +2029,10 @@ impl Editor {
                 let doc = doc_mut!(self, &view.doc);
                 view.sync_changes(doc);
             }
-            let view = view!(self, view_id);
-            let doc = doc_mut!(self, &view.doc);
+            let view = self.tree.get_mut(view_id);
+            view.mark_as_focused();
+            let doc_id = view.doc;
+            let doc = doc_mut!(self, &doc_id);
             doc.mark_as_focused();
             let focus_lost = self.tree.get(prev_id).doc;
             dispatch(DocumentFocusLost {

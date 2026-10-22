@@ -20,6 +20,21 @@ Updated languages and queries:
 Packaging:
 -->
 
+# Unreleased
+
+Breaking changes:
+
+* `G` now opens the reuse-existing-view Goto menu. `goto_line` moved to `gG` or `GG`.
+
+Features:
+
+* Add `:format-modified` and the `format_modified_lines` command to format only lines changed relative to the version control base using LSP range formatting.
+* Add `Alt-r` in pickers and a `Shift-g` Goto menu that never open in the current view: they focus a view already displaying the target file or create a new split. The picker key is configurable with `picker-open-existing`.
+
+Usability improvements:
+
+* Show the executable path in `hx --version` output.
+
 # 25.07.1 (2025-07-18)
 
 This is a patch release which lowers the GLIBC requirements of the release artifacts published to GitHub ([#13983](https://github.com/helix-editor/helix/pull/13983))

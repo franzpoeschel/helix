@@ -1,6 +1,7 @@
 use super::*;
 
 use helix_stdx::path;
+use helix_view::{doc, editor::Action};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_split_write_quit_all() -> anyhow::Result<()> {
@@ -192,6 +193,210 @@ async fn test_changes_in_splits_apply_to_all_views() -> anyhow::Result<()> {
         LineFeedHandling::AsIs,
     ))
     .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_picker_alt_r_reuses_existing_view() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let file_a = dir.path().join("a.txt");
+    let file_b = dir.path().join("b.txt");
+    std::fs::write(&file_a, "a")?;
+    std::fs::write(&file_b, "b")?;
+
+    let mut app = helpers::AppBuilder::new()
+        .with_file(&file_a, None)
+        .build()?;
+
+    let keys = format!(
+        ":sp<ret>:o {}<ret>:sp<ret>:o {}<ret><space>bb.txt<A-r>",
+        file_b.display(),
+        file_a.display()
+    );
+
+    test_key_sequences(
+        &mut app,
+        vec![
+            (
+                Some(&keys),
+                Some(&|app| {
+                    assert_eq!(3, app.editor.tree.views().count());
+                    assert_eq!(
+                        1,
+                        app.editor
+                            .tree
+                            .views()
+                            .filter(|(view, _)| view.doc == doc!(app.editor).id())
+                            .count()
+                    );
+                    assert_eq!(
+                        Some(&path::normalize(&file_b)),
+                        doc!(app.editor).path(),
+                        "the existing view for b.txt should be focused"
+                    );
+                }),
+            ),
+            (Some(":qa!<ret>"), None),
+        ],
+        true,
+    )
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_goto_existing_reuses_existing_view() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let file_a = dir.path().join("a.txt");
+    let file_b = dir.path().join("b.txt");
+    std::fs::write(&file_a, "a")?;
+    std::fs::write(&file_b, "b")?;
+
+    let mut app = helpers::AppBuilder::new()
+        .with_file(&file_a, None)
+        .build()?;
+
+    let keys = format!(":sp<ret>:o {}<ret><C-w>wGp", file_b.display());
+
+    test_key_sequences(
+        &mut app,
+        vec![
+            (
+                Some(&keys),
+                Some(&|app| {
+                    assert_eq!(2, app.editor.tree.views().count());
+                    assert_eq!(
+                        1,
+                        app.editor
+                            .tree
+                            .views()
+                            .filter(|(view, _)| view.doc == doc!(app.editor).id())
+                            .count()
+                    );
+                    assert_eq!(
+                        Some(&path::normalize(&file_b)),
+                        doc!(app.editor).path(),
+                        "the existing view for b.txt should be focused"
+                    );
+                    assert!(
+                        app.editor
+                            .tree
+                            .views()
+                            .any(|(view, _)| view.doc != doc!(app.editor).id()),
+                        "the original view for a.txt should remain open"
+                    );
+                }),
+            ),
+            (Some(":qa!<ret>"), None),
+        ],
+        true,
+    )
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_focus_or_split_uses_most_recent_view() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let file_a = dir.path().join("a.txt");
+    let file_b = dir.path().join("b.txt");
+    std::fs::write(&file_a, "a")?;
+    std::fs::write(&file_b, "b")?;
+
+    let mut app = helpers::AppBuilder::new()
+        .with_file(&file_a, None)
+        .build()?;
+    helpers::run_event_loop_until_idle(&mut app).await;
+
+    let a_id = app
+        .editor
+        .document_id_by_path(&path::canonicalize(&file_a))
+        .unwrap();
+    let b_id = app.editor.open(&file_b, Action::VerticalSplit)?;
+    app.editor.open(&file_b, Action::VerticalSplit)?;
+
+    let b_views: Vec<_> = app
+        .editor
+        .tree
+        .views()
+        .filter(|(view, _)| view.doc == b_id)
+        .map(|(view, _)| view.id)
+        .collect();
+    assert_eq!(2, b_views.len());
+
+    let a_view = app
+        .editor
+        .tree
+        .views()
+        .find(|(view, _)| view.doc == a_id)
+        .map(|(view, _)| view.id)
+        .unwrap();
+
+    app.editor.focus(b_views[0]);
+    app.editor.focus(b_views[1]);
+    app.editor.focus(a_view);
+    app.editor.switch(b_id, Action::FocusOrSplit);
+
+    assert_eq!(
+        b_views[1], app.editor.tree.focus,
+        "the most recently focused view showing b.txt should be selected"
+    );
+
+    app.editor.focus(b_views[1]);
+    app.editor.switch(b_id, Action::FocusOrSplit);
+    assert_eq!(
+        b_views[0], app.editor.tree.focus,
+        "the currently focused view should be the lowest priority"
+    );
+
+    let file_c = dir.path().join("c.txt");
+    std::fs::write(&file_c, "c")?;
+    let view_count = app.editor.tree.views().count();
+    let c_id = app.editor.open(&file_c, Action::FocusOrSplit)?;
+    assert_eq!(c_id, doc!(app.editor).id());
+    assert_eq!(
+        view_count + 1,
+        app.editor.tree.views().count(),
+        "opening a buffer that is not displayed should create a new split"
+    );
+    assert_eq!(
+        2,
+        app.editor
+            .tree
+            .views()
+            .filter(|(view, _)| view.doc == b_id)
+            .count()
+    );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_focus_or_split_splits_single_view() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let file_a = dir.path().join("a.txt");
+    let file_b = dir.path().join("b.txt");
+    std::fs::write(&file_a, "a")?;
+    std::fs::write(&file_b, "b")?;
+
+    let mut app = helpers::AppBuilder::new()
+        .with_file(&file_a, None)
+        .build()?;
+    helpers::run_event_loop_until_idle(&mut app).await;
+
+    let a_id = app
+        .editor
+        .document_id_by_path(&path::canonicalize(&file_a))
+        .unwrap();
+    let b_id = app.editor.open(&file_b, Action::FocusOrSplit)?;
+
+    assert_eq!(b_id, doc!(app.editor).id());
+    assert_eq!(2, app.editor.tree.views().count());
+    assert!(app.editor.tree.views().any(|(view, _)| view.doc == a_id));
+    assert!(app.editor.tree.views().any(|(view, _)| view.doc == b_id));
 
     Ok(())
 }

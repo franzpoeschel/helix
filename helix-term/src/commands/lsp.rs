@@ -11,7 +11,7 @@ use helix_lsp::{
 use tokio_stream::StreamExt;
 use tui::{text::Span, widgets::Row};
 
-use super::{align_view, push_jump, Align, Context, Editor};
+use super::{align_view, Align, Context, Editor};
 
 use helix_core::{
     diagnostic::DiagnosticProvider, syntax::config::LanguageServerFeature,
@@ -110,14 +110,18 @@ fn location_to_file_location(location: &Location) -> Option<FileLocation> {
 }
 
 fn jump_to_location(editor: &mut Editor, location: &Location, action: Action) {
-    let (view, doc) = current!(editor);
-    push_jump(view, doc);
-
     let Some(path) = location.uri.as_path() else {
         let err = format!("unable to convert URI to filepath: {:?}", location.uri);
         editor.set_error(err);
         return;
     };
+
+    let (source_view, jump) = {
+        let (view, doc) = current!(editor);
+        doc.append_changes_to_history(view);
+        (view.id, (doc.id(), doc.selection(view.id).clone()))
+    };
+
     jump_to_position(
         editor,
         path,
@@ -125,6 +129,13 @@ fn jump_to_location(editor: &mut Editor, location: &Location, action: Action) {
         location.offset_encoding,
         action,
     );
+
+    let target_view = if matches!(action, Action::FocusOrSplit) {
+        editor.tree.focus
+    } else {
+        source_view
+    };
+    editor.tree.get_mut(target_view).jumps.push(jump);
 }
 
 fn jump_to_position(
@@ -846,12 +857,17 @@ impl Display for ApplyEditErrorKind {
 }
 
 /// Precondition: `locations` should be non-empty.
-fn goto_impl(editor: &mut Editor, compositor: &mut Compositor, locations: Vec<Location>) {
+fn goto_impl(
+    editor: &mut Editor,
+    compositor: &mut Compositor,
+    locations: Vec<Location>,
+    action: Action,
+) {
     let cwdir = helix_stdx::env::current_working_dir();
 
     match locations.as_slice() {
         [location] => {
-            jump_to_location(editor, location, Action::Replace);
+            jump_to_location(editor, location, action);
         }
         [] => unreachable!("`locations` should be non-empty for `goto_impl`"),
         _locations => {
@@ -871,14 +887,19 @@ fn goto_impl(editor: &mut Editor, compositor: &mut Compositor, locations: Vec<Lo
             let picker = Picker::new(columns, 0, locations, cwdir, |cx, location, action| {
                 jump_to_location(cx.editor, location, action)
             })
-            .with_preview(|_editor, location| location_to_file_location(location));
+            .with_preview(|_editor, location| location_to_file_location(location))
+            .with_default_action(action);
             compositor.push(Box::new(overlaid(picker)));
         }
     }
 }
 
-fn goto_single_impl<P, F>(cx: &mut Context, feature: LanguageServerFeature, request_provider: P)
-where
+fn goto_single_impl<P, F>(
+    cx: &mut Context,
+    feature: LanguageServerFeature,
+    action: Action,
+    request_provider: P,
+) where
     P: Fn(&Client, lsp::Position, lsp::TextDocumentIdentifier) -> Option<F>,
     F: Future<Output = helix_lsp::Result<Option<lsp::GotoDefinitionResponse>>> + 'static + Send,
 {
@@ -930,7 +951,7 @@ where
             if locations.is_empty() {
                 editor.set_error("No definition found.");
             } else {
-                goto_impl(editor, compositor, locations);
+                goto_impl(editor, compositor, locations, action);
             }
         };
         Ok(Callback::EditorCompositor(Box::new(call)))
@@ -938,38 +959,82 @@ where
 }
 
 pub fn goto_declaration(cx: &mut Context) {
+    goto_declaration_impl(cx, Action::Replace);
+}
+
+pub fn goto_declaration_existing(cx: &mut Context) {
+    goto_declaration_impl(cx, Action::FocusOrSplit);
+}
+
+fn goto_declaration_impl(cx: &mut Context, action: Action) {
     goto_single_impl(
         cx,
         LanguageServerFeature::GotoDeclaration,
+        action,
         |ls, pos, doc_id| ls.goto_declaration(doc_id, pos, None),
     );
 }
 
 pub fn goto_definition(cx: &mut Context) {
+    goto_definition_impl(cx, Action::Replace);
+}
+
+pub fn goto_definition_existing(cx: &mut Context) {
+    goto_definition_impl(cx, Action::FocusOrSplit);
+}
+
+fn goto_definition_impl(cx: &mut Context, action: Action) {
     goto_single_impl(
         cx,
         LanguageServerFeature::GotoDefinition,
+        action,
         |ls, pos, doc_id| ls.goto_definition(doc_id, pos, None),
     );
 }
 
 pub fn goto_type_definition(cx: &mut Context) {
+    goto_type_definition_impl(cx, Action::Replace);
+}
+
+pub fn goto_type_definition_existing(cx: &mut Context) {
+    goto_type_definition_impl(cx, Action::FocusOrSplit);
+}
+
+fn goto_type_definition_impl(cx: &mut Context, action: Action) {
     goto_single_impl(
         cx,
         LanguageServerFeature::GotoTypeDefinition,
+        action,
         |ls, pos, doc_id| ls.goto_type_definition(doc_id, pos, None),
     );
 }
 
 pub fn goto_implementation(cx: &mut Context) {
+    goto_implementation_impl(cx, Action::Replace);
+}
+
+pub fn goto_implementation_existing(cx: &mut Context) {
+    goto_implementation_impl(cx, Action::FocusOrSplit);
+}
+
+fn goto_implementation_impl(cx: &mut Context, action: Action) {
     goto_single_impl(
         cx,
         LanguageServerFeature::GotoImplementation,
+        action,
         |ls, pos, doc_id| ls.goto_implementation(doc_id, pos, None),
     );
 }
 
 pub fn goto_reference(cx: &mut Context) {
+    goto_reference_impl(cx, Action::Replace);
+}
+
+pub fn goto_reference_existing(cx: &mut Context) {
+    goto_reference_impl(cx, Action::FocusOrSplit);
+}
+
+fn goto_reference_impl(cx: &mut Context, action: Action) {
     let config = cx.editor.config();
     let (view, doc) = current_ref!(cx.editor);
 
@@ -1007,7 +1072,7 @@ pub fn goto_reference(cx: &mut Context) {
             if locations.is_empty() {
                 editor.set_error("No references found.");
             } else {
-                goto_impl(editor, compositor, locations);
+                goto_impl(editor, compositor, locations, action);
             }
         };
         Ok(Callback::EditorCompositor(Box::new(call)))

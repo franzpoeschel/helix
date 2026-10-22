@@ -317,7 +317,7 @@ fn buffer_next(
         return Ok(());
     }
 
-    goto_buffer(cx.editor, Direction::Forward, 1);
+    goto_buffer(cx.editor, Direction::Forward, 1, Action::Replace);
     Ok(())
 }
 
@@ -330,7 +330,7 @@ fn buffer_previous(
         return Ok(());
     }
 
-    goto_buffer(cx.editor, Direction::Backward, 1);
+    goto_buffer(cx.editor, Direction::Backward, 1, Action::Replace);
     Ok(())
 }
 
@@ -543,6 +543,18 @@ fn format(cx: &mut compositor::Context, _args: Args, event: PromptEvent) -> anyh
     cx.jobs.callback(callback);
 
     Ok(())
+}
+
+fn format_modified(
+    cx: &mut compositor::Context,
+    _args: Args,
+    event: PromptEvent,
+) -> anyhow::Result<()> {
+    if event != PromptEvent::Validate {
+        return Ok(());
+    }
+
+    format_modified_lines_impl(cx.editor, cx.jobs)
 }
 
 fn set_indent_style(
@@ -2851,6 +2863,17 @@ pub const TYPABLE_COMMAND_LIST: &[TypableCommand] = &[
         aliases: &["fmt"],
         doc: "Format the file using an external formatter or language server.",
         fun: format,
+        completer: CommandCompleter::none(),
+        signature: Signature {
+            positionals: (0, Some(0)),
+            ..Signature::DEFAULT
+        },
+    },
+    TypableCommand {
+        name: "format-modified",
+        aliases: &[],
+        doc: "Format only the lines modified relative to the version control base using language server range formatting.",
+        fun: format_modified,
         completer: CommandCompleter::none(),
         signature: Signature {
             positionals: (0, Some(0)),
