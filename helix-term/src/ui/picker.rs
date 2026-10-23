@@ -49,7 +49,7 @@ use helix_view::{
     graphics::{CursorKind, Margin, Modifier, Rect},
     theme::Style,
     view::ViewPosition,
-    Document, DocumentId, Editor,
+    Document, DocumentId, Editor, ViewId,
 };
 
 use self::handlers::{DynamicQueryChange, DynamicQueryHandler, PreviewHighlightHandler};
@@ -259,6 +259,7 @@ pub struct Picker<T: 'static + Send + Sync, D: 'static> {
 
     callback_fn: PickerCallback<T>,
     default_action: Action,
+    origin_view: Option<ViewId>,
 
     pub truncate_start: bool,
     /// Caches paths to documents
@@ -384,6 +385,7 @@ impl<T: 'static + Send + Sync, D: 'static + Send + Sync> Picker<T, D> {
             show_preview: true,
             callback_fn: Box::new(callback_fn),
             default_action: Action::Replace,
+            origin_view: None,
             completion_height: 0,
             widths,
             preview_cache: HashMap::new(),
@@ -1034,6 +1036,12 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
             _ => return EventResult::Ignored(None),
         };
 
+        let origin_view = *self.origin_view.get_or_insert(ctx.editor.tree.focus);
+        let action_for = |action| match action {
+            Action::FocusOrSplit(_) => Action::FocusOrSplit(Some(origin_view)),
+            action => action,
+        };
+
         let close_fn = |picker: &mut Self| {
             // if the picker is very large don't store it as last_picker to avoid
             // excessive memory consumption
@@ -1059,7 +1067,7 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
 
         if key_event == ctx.editor.config().picker_open_existing {
             if let Some(option) = self.selection() {
-                (self.callback_fn)(ctx, option, Action::FocusOrSplit);
+                (self.callback_fn)(ctx, option, action_for(Action::FocusOrSplit(None)));
             }
             if let Some(history_register) = self.prompt.history_register() {
                 if let Err(err) = ctx
@@ -1114,7 +1122,7 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
                     self.handle_prompt_change(true);
                 } else {
                     if let Some(option) = self.selection() {
-                        (self.callback_fn)(ctx, option, self.default_action);
+                        (self.callback_fn)(ctx, option, action_for(self.default_action));
                     }
                     if let Some(history_register) = self.prompt.history_register() {
                         if let Err(err) = ctx
@@ -1130,18 +1138,18 @@ impl<I: 'static + Send + Sync, D: 'static + Send + Sync> Component for Picker<I,
             }
             alt!(Enter) => {
                 if let Some(option) = self.selection() {
-                    (self.callback_fn)(ctx, option, self.default_action);
+                    (self.callback_fn)(ctx, option, action_for(self.default_action));
                 }
             }
             ctrl!('s') => {
                 if let Some(option) = self.selection() {
-                    (self.callback_fn)(ctx, option, Action::HorizontalSplit);
+                    (self.callback_fn)(ctx, option, action_for(Action::HorizontalSplit));
                 }
                 return close_fn(self);
             }
             ctrl!('v') => {
                 if let Some(option) = self.selection() {
-                    (self.callback_fn)(ctx, option, Action::VerticalSplit);
+                    (self.callback_fn)(ctx, option, action_for(Action::VerticalSplit));
                 }
                 return close_fn(self);
             }

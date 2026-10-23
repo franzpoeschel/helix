@@ -247,6 +247,52 @@ async fn test_picker_alt_r_reuses_existing_view() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
+async fn test_reopened_picker_keeps_origin_view() -> anyhow::Result<()> {
+    let dir = tempfile::tempdir()?;
+    let file_a = dir.path().join("a.txt");
+    let file_b = dir.path().join("b.txt");
+    std::fs::write(&file_a, "a")?;
+    std::fs::write(&file_b, "b")?;
+
+    let mut app = helpers::AppBuilder::new()
+        .with_file(&file_a, None)
+        .build()?;
+
+    let keys = format!(
+        ":sp<ret>:o {}<ret><C-w>w<space>bb.txt<A-r>",
+        file_b.display()
+    );
+
+    test_key_sequences(
+        &mut app,
+        vec![
+            (Some(&keys), None),
+            (
+                Some("<space>'<A-r>"),
+                Some(&|app| {
+                    let b_id = app
+                        .editor
+                        .document_id_by_path(&path::normalize(&file_b))
+                        .unwrap();
+
+                    assert_eq!(b_id, doc!(app.editor).id());
+                    assert_eq!(
+                        2,
+                        app.editor.tree.views().count(),
+                        "the reopened picker should keep using the original view as reference"
+                    );
+                }),
+            ),
+            (Some(":qa!<ret>"), None),
+        ],
+        true,
+    )
+    .await?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
 async fn test_goto_existing_reuses_existing_view() -> anyhow::Result<()> {
     let dir = tempfile::tempdir()?;
     let file_a = dir.path().join("a.txt");
@@ -313,7 +359,7 @@ async fn test_focus_or_split_uses_most_recent_view() -> anyhow::Result<()> {
 
     let a_id = app
         .editor
-        .document_id_by_path(&path::canonicalize(&file_a))
+        .document_id_by_path(&path::normalize(&file_a))
         .unwrap();
     let b_id = app.editor.open(&file_b, Action::VerticalSplit)?;
     app.editor.open(&file_b, Action::VerticalSplit)?;
@@ -338,7 +384,7 @@ async fn test_focus_or_split_uses_most_recent_view() -> anyhow::Result<()> {
     app.editor.focus(b_views[0]);
     app.editor.focus(b_views[1]);
     app.editor.focus(a_view);
-    app.editor.switch(b_id, Action::FocusOrSplit);
+    app.editor.switch(b_id, Action::FocusOrSplit(None));
 
     assert_eq!(
         b_views[1], app.editor.tree.focus,
@@ -346,7 +392,7 @@ async fn test_focus_or_split_uses_most_recent_view() -> anyhow::Result<()> {
     );
 
     app.editor.focus(b_views[1]);
-    app.editor.switch(b_id, Action::FocusOrSplit);
+    app.editor.switch(b_id, Action::FocusOrSplit(None));
     assert_eq!(
         b_views[0], app.editor.tree.focus,
         "the currently focused view should be the lowest priority"
@@ -355,7 +401,7 @@ async fn test_focus_or_split_uses_most_recent_view() -> anyhow::Result<()> {
     let file_c = dir.path().join("c.txt");
     std::fs::write(&file_c, "c")?;
     let view_count = app.editor.tree.views().count();
-    let c_id = app.editor.open(&file_c, Action::FocusOrSplit)?;
+    let c_id = app.editor.open(&file_c, Action::FocusOrSplit(None))?;
     assert_eq!(c_id, doc!(app.editor).id());
     assert_eq!(
         view_count + 1,
@@ -389,9 +435,9 @@ async fn test_focus_or_split_splits_single_view() -> anyhow::Result<()> {
 
     let a_id = app
         .editor
-        .document_id_by_path(&path::canonicalize(&file_a))
+        .document_id_by_path(&path::normalize(&file_a))
         .unwrap();
-    let b_id = app.editor.open(&file_b, Action::FocusOrSplit)?;
+    let b_id = app.editor.open(&file_b, Action::FocusOrSplit(None))?;
 
     assert_eq!(b_id, doc!(app.editor).id());
     assert_eq!(2, app.editor.tree.views().count());

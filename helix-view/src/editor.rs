@@ -1188,8 +1188,9 @@ pub enum Action {
     Load,
     Replace,
     /// Focus an existing view if the document is already displayed in one,
-    /// otherwise open the document in a new split.
-    FocusOrSplit,
+    /// otherwise open the document in a new split. The optional view is the
+    /// reference view to exclude; the currently focused view is used if absent.
+    FocusOrSplit(Option<ViewId>),
     HorizontalSplit,
     VerticalSplit,
 }
@@ -1638,12 +1639,12 @@ impl Editor {
         view.ensure_cursor_in_view(doc, scrolloff)
     }
 
-    /// Find a view other than the currently focused one displaying the given
-    /// document. Among matching views, the most recently focused view is chosen.
-    fn view_id_for_document(&self, id: DocumentId) -> Option<ViewId> {
+    /// Find a view other than the reference view displaying the given document.
+    /// Among matching views, the most recently focused view is chosen.
+    fn view_id_for_document(&self, id: DocumentId, reference_view: ViewId) -> Option<ViewId> {
         self.tree
             .views()
-            .filter(|(view, _)| view.doc == id && view.id != self.tree.focus)
+            .filter(|(view, _)| view.doc == id && view.id != reference_view)
             .max_by_key(|(view, _)| view.focused_at)
             .map(|(view, _)| view.id)
     }
@@ -1677,15 +1678,23 @@ impl Editor {
             self.enter_normal_mode();
         }
 
-        if matches!(action, Action::FocusOrSplit) {
-            if let Some(view_id) = self.view_id_for_document(id) {
+        if let Action::FocusOrSplit(reference_view) = action {
+            let reference_view = reference_view
+                .filter(|view_id| self.tree.views().any(|(view, _)| view.id == *view_id))
+                .unwrap_or(self.tree.focus);
+
+            if let Some(view_id) = self.view_id_for_document(id, reference_view) {
                 self.focus(view_id);
                 return;
+            }
+
+            if reference_view != self.tree.focus {
+                self.focus(reference_view);
             }
         }
 
         let action = match action {
-            Action::FocusOrSplit => self.split_action_for_current_view(),
+            Action::FocusOrSplit(_) => self.split_action_for_current_view(),
             action => action,
         };
 
@@ -1776,7 +1785,7 @@ impl Editor {
                 doc.mark_as_focused();
                 focus_lost
             }
-            Action::FocusOrSplit => unreachable!("handled above"),
+            Action::FocusOrSplit(_) => unreachable!("handled above"),
         };
 
         self._refresh();

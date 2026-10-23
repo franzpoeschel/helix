@@ -33,6 +33,7 @@ Features:
 
 Usability improvements:
 
+* Reopened pickers remember the view they were originally opened from as the reference for reuse-existing-view navigation.
 * Show the executable path in `hx --version` output.
 
 # 25.07.1 (2025-07-18)
